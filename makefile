@@ -14,11 +14,12 @@ OBJS = $(SRCS:src/%.c=obj/%.o)
 
 CFLAGS = $(INCS) -Wall -Werror -g -fsanitize=address -fPIC
 
-all: $(OBJS) ext/libgff | lib
+all: ext/libgff/build/src/libgff.so $(OBJS) | lib
 	gcc $(CFLAGS) $(OBJS) $(LIBS) -shared -o lib/libsoloscuro.so
 
-ext/libgff:
-	git submodules pull
+ext/libgff/build/src/libgff.so:
+	git submodule update --init
+	cd ext/libgff ; make
 
 lib:
 	mkdir -p lib
