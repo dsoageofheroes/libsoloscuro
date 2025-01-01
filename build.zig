@@ -23,6 +23,7 @@ pub fn build(b: *std.Build) void {
         .files = &.{
             "alignment.c",
             "class.c",
+            "entity.c",
             "race.c",
             "stats.c",
         },
