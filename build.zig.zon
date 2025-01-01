@@ -1,0 +1,10 @@
+.{
+    .name = "libgff",
+    .version = "0.6.0",
+    .dependencies = .{
+        .libgff = .{
+            .path = "ext/libgff",
+        },
+    },
+    .paths = .{""},
+}
