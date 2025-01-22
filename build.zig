@@ -13,7 +13,7 @@ pub fn build(b: *std.Build) void {
         .name = "soloscuro",
         .target = target,
         .optimize = optimize,
-        .version = .{.major = 0, .minor = 6, .patch = 0},
+        .version = .{ .major = 0, .minor = 6, .patch = 0 },
     });
 
     libsoloscuro.addIncludePath(b.path("include"));
@@ -24,7 +24,10 @@ pub fn build(b: *std.Build) void {
             "alignment.c",
             "class.c",
             "entity.c",
+            "gui.c",
+            "region.c",
             "race.c",
+            "state.c",
             "stats.c",
         },
     });

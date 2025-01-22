@@ -1,5 +1,6 @@
 #include <soloscuro/race.h>
 
+/*
 //    str dex con int wis chr
 const static int8_t race_mods[][6] = {
     {  0,  0,  0,  0,  0,  0  }, // MONSTER
@@ -108,3 +109,4 @@ extern int sol_dnd2e_race_apply_initial_stats(sol_entity_t *pc) {
     if (pc->stats.cha   > racial_stats[pc->race][5][1]) { pc->stats.cha   = racial_stats[pc->race][5][0]; }
     return EXIT_SUCCESS;
 }
+*/

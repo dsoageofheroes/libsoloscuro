@@ -1,9 +1,9 @@
 //#include "soloscuro/combat.h"
 //#include "soloscuro/debug.h"
-#include "soloscuro/alignment.h"
-#include "soloscuro/item.h"
+#include <soloscuro/alignment.h>
+#include <soloscuro/item.h>
 //#include "gpl.h"
-#include "soloscuro/entity.h"
+#include <soloscuro/entity.h>
 //#include "innate.h"
 //#include "soloscuro/rules.h"
 //#include "port.h"
@@ -14,10 +14,87 @@
 #include <gff/gff.h>
 #include <gff/gfftypes.h>
 #include <gff/region.h>
+
 #include <string.h>
+
+#define MAX_ENTITIES (65536)
+
+static uint32_t entity_pos = 0;
+static sol_dude_t entities[MAX_ENTITIES];
+
+extern int sol_entities_init() {
+    memset(entities, 0x0, sizeof(sol_dude_t) * MAX_ENTITIES);
+    entity_pos = 0;
+    return EXIT_SUCCESS;
+}
+
+static int is_alloc(sol_dude_handle_t dude) {
+    return entities[dude].ds_id != 0;
+}
+
+static void allocate_dude(sol_dude_handle_t dude) {
+    entities[dude].ds_id = -1;
+}
+
+static sol_dude_handle_t get_valid_handle() {
+    while (is_alloc(entity_pos) && entity_pos < MAX_ENTITIES) {
+        entity_pos++;
+    }
+
+    if (!is_alloc(entity_pos)) {
+        allocate_dude(entity_pos);
+        return entity_pos;
+    }
+
+    entity_pos = 0;
+
+    while (entities[entity_pos].ds_id != 0 && entity_pos < MAX_ENTITIES) {
+        entity_pos++;
+    }
+
+    if (!is_alloc(entity_pos)) {
+        allocate_dude(entity_pos);
+        return entity_pos;
+    }
+
+    return MAX_ENTITIES;
+}
+
+extern sol_dude_handle_t sol_entity_create_from_etab(soloscuro_state_t *state, int reg_id, int etab_id) {
+    if (!state || reg_id < 0 || reg_id >= MAX_REGIONS || !state->regions[reg_id].gff_reg.etab) {
+        return MAX_ENTITIES;
+    }
+
+    if (etab_id < 0 || etab_id >= state->regions[reg_id].gff_reg.num_objects) {
+        return MAX_ENTITIES;
+    }
+
+    gff_ojff_t ojff;
+    sol_dude_handle_t ret = get_valid_handle();
+    sol_dude_t *dude = entities + (ret % MAX_ENTITIES);
+
+    gff_etab_object_t *eo = state->regions[reg_id].gff_reg.etab + etab_id;
+
+    //TODO: Account for different Games.
+    gff_ojff_read(state->man.ds1.segobjex, eo->index, &ojff);
+    dude->x = ojff.xpos;
+    dude->y = ojff.ypos;
+    dude->z = ojff.zpos;
+    dude->bmp = ojff.bmp_id;
+    dude->script = ojff.script_id;
+    /* Ignored:
+    uint16_t flags;
+    int16_t  xoffset;
+    int16_t  yoffset;
+    uint8_t  object_index;
+    */
+    //printf("(%d, %d, %d) bmp: %d, script: %d\n", ojff.xpos, ojff.ypos, ojff.zpos, dude->bmp, dude->script);
+    return ret;
+}
 
 extern char *strdup(const char *s); // Not in standard.
 
+/*
 static void apply_combat(sol_dude_t *dude, ds1_combat_t *combat) {
     // Not used from combat: char_index, id, read_item_index, weapon_index, pack_index, icon
     //                       ac, move, status, thac0, priority, flags
@@ -39,7 +116,9 @@ static void apply_combat(sol_dude_t *dude, ds1_combat_t *combat) {
     strncpy(dude->name, combat->name, 32);
     dude->name[31] = '\0';
 }
+*/
 
+/*
 static void apply_character(sol_dude_t *dude, ds_character_t *ch) {
     // Not used from ch: id, legal_class, num_blows, spell_group, psi_group, palette.
     dude->class[0].current_xp = ch->current_xp;
@@ -84,6 +163,7 @@ static void apply_character(sol_dude_t *dude, ds_character_t *ch) {
     dude->sound_fx = ch->sound_fx;
     dude->attack_sound = ch->attack_sound;
 }
+*/
 
 /*
 extern int sol_entity_create_default_human(sol_entity_t **ret) {
@@ -303,45 +383,23 @@ extern int sol_entity_load_from_gff(soloscuro_state_t *state, sol_entity_t *enti
 */
 
 /*
-extern int sol_entity_create_from_etab(gff_map_object_t *entry_table, uint32_t id, sol_entity_t **ret) {
-    sol_dude_t *dude = calloc(1, sizeof(sol_dude_t));
-    if (!dude) { return EXIT_FAILURE; }
-    const gff_map_object_t *gm = entry_table + id;
-    disk_object_t disk_object;
-
-    gff_read_object(gm->index, &disk_object);
-    dude->object_flags = disk_object.flags;
-    //dude->anim.bmp_id = disk_object.bmp_id;
-    //dude->anim.spr = SPRITE_ERROR;
-    dude->ds_id = gm->index;
-
-    dude->mapx = (gm->xpos) / 16;
-    dude->mapy = (gm->ypos) / 16;
-    //dude->anim.xoffset = -disk_object.xoffset + ((gm->xpos) % 16);
-    //dude->anim.yoffset = -disk_object.yoffset  - disk_object.zpos + ((gm->ypos)) % 16;
-    dude->mapz = gm->zpos;
-    dude->map_flags = gm->flags;
-
-    *ret = dude;
-    return EXIT_SUCCESS;
-}
 */
 
 extern int sol_entity_copy_item(sol_entity_t *entity, sol_item_t *item, const size_t slot) {
     if (!entity || !item) { return EXIT_FAILURE; }
     if (slot < 0 || slot >= ITEM_SLOT_MAX) {return EXIT_FAILURE;}
     //TODO: Take care of effects!
-    memcpy(entity->inv + slot, item, sizeof(sol_item_t));
+    //memcpy(entity->inv + slot, item, sizeof(sol_item_t));
 
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
 }
 
 extern int sol_entity_clear_item(sol_entity_t *entity, const size_t slot) {
     if (!entity) { return EXIT_FAILURE; }
     if (slot < 0 || slot >= ITEM_SLOT_MAX) {return EXIT_FAILURE;}
-    memset(entity->inv + slot, 0x0, sizeof(sol_item_t));
+    //memset(entity->inv + slot, 0x0, sizeof(sol_item_t));
     //entity->inv[slot].anim.spr = SPRITE_ERROR;
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
 }
 
 extern int sol_entity_get_total_exp(sol_entity_t *entity, int32_t *exp) {
@@ -630,8 +688,8 @@ extern int sol_entity_get_ranger_level(sol_entity_t *entity, uint8_t *level) {
 extern int sol_entity_create_fake(const int mapx, const int mapy, sol_entity_t **ret) {
     sol_dude_t *dude = calloc(1, sizeof(sol_dude_t));
     if (!dude) { return EXIT_FAILURE; }
-    dude->mapx = mapx;
-    dude->mapy = mapy;
+    dude->x = mapx;
+    dude->y = mapy;
     //dude->anim.spr = SPRITE_ERROR;
     *ret = dude;
     return EXIT_SUCCESS;
@@ -644,8 +702,8 @@ extern int sol_entity_is_fake(sol_entity_t *entity) {
 extern int sol_entity_distance(const sol_entity_t *source, const sol_entity_t *dest, int16_t *dist) {
     if (!source || !dest) { return EXIT_FAILURE; }
 
-    int dx = abs(source->mapx - dest->mapx);
-    int dy = abs(source->mapy - dest->mapy);
+    int dx = abs(source->x - dest->x);
+    int dy = abs(source->y - dest->y);
 
     *dist = dx > dy ? dx : dy;
     return EXIT_SUCCESS;
@@ -657,27 +715,29 @@ extern int sol_entity_go(sol_entity_t *dude, const uint16_t x, uint16_t y) {
     dude->abilities.must_go = 1;
     dude->abilities.args.pos.x = x;
     dude->abilities.args.pos.y = y;
-    printf("%s given go order to (%d, %d)\n", dude->name, x, y);
+    //printf("%s given go order to (%d, %d)\n", dude->name, x, y);
 
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
 }
 
 extern int sol_entity_debug(sol_entity_t *dude) {
     if (!dude) { return EXIT_FAILURE; }
-    printf("entity ('%s): \n", dude->name);
+    //printf("entity ('%s): \n", dude->name);
+    printf("entity (): \n");
     printf("    .ds_id = %d\n", dude->ds_id);
-    printf("    .size = %d\n", dude->size);
-    printf("    .race = %d\n", dude->race);
-    printf("    .gender = %d\n", dude->gender);
-    printf("    .alignment = %d\n", dude->alignment);
-    printf("    .allegiance = %d\n", dude->allegiance);
-    printf("    .object_flags = %x\n", dude->object_flags);
-    printf("    .direction = %d\n", dude->direction);
-    printf("    .region = %d\n", dude->region);
-    printf("    pos = (%d, %d, %d)\n", dude->mapx, dude->mapy, dude->mapz);
-    printf("    .sound_fx = %d\n", dude->sound_fx);
-    printf("    .attack_sound = %d\n", dude->attack_sound);
-    printf("    .combat_status = %d\n", dude->combat_status);
+    //printf("    .size = %d\n", dude->size);
+    //printf("    .race = %d\n", dude->race);
+    //printf("    .gender = %d\n", dude->gender);
+    //printf("    .alignment = %d\n", dude->alignment);
+    //printf("    .allegiance = %d\n", dude->allegiance);
+    //printf("    .object_flags = %x\n", dude->object_flags);
+    //printf("    .direction = %d\n", dude->direction);
+    //printf("    .region = %d\n", dude->region);
+    //printf("    pos = (%d, %d, %d)\n", dude->mapx, dude->mapy, dude->mapz);
+    printf("    pos = (%d, %d, %d)\n", dude->x, dude->y, dude->z);
+    //printf("    .sound_fx = %d\n", dude->sound_fx);
+    //printf("    .attack_sound = %d\n", dude->attack_sound);
+    //printf("    .combat_status = %d\n", dude->combat_status);
     printf("    stats = (%d, %d %d, %d, %d, %d)\n", dude->stats.str, dude->stats.dex, dude->stats.con, dude->stats.intel, dude->stats.wis, dude->stats.cha);
     printf("    .class[0] = (current_xp = %d, high_xp = %d, class = %d, level = %d, high_level = %d\n",
             dude->class[0].current_xp,
@@ -701,6 +761,7 @@ extern int sol_entity_debug(sol_entity_t *dude) {
     return EXIT_SUCCESS;
 }
 
+/*
 static char* racetostr(int race) {
     switch (race) {
         case RACE_MONSTER: return "Monster";
@@ -715,10 +776,12 @@ static char* racetostr(int race) {
     }
     return "UNKNOWN";
 }
+*/
 
 extern int sol_dude_print(sol_dude_t *pc) {
-    printf("Dude '%s':\n", pc->name);
-    printf("    race: %s\n", racetostr(pc->race));
-    printf("    gender: %s\n", pc->gender == GENDER_MALE ? "Male" : "Female");
+    //printf("Dude '%s':\n", pc->name);
+    //printf("    race: %s\n", racetostr(pc->race));
+    //printf("    gender: %s\n", pc->gender == GENDER_MALE ? "Male" : "Female");
     printf("    str: %d dex: %d con: %d int: %d wis: %d cha: %d\n", pc->stats.str, pc->stats.dex, pc->stats.con, pc->stats.intel, pc->stats.wis, pc->stats.cha);
+    return EXIT_SUCCESS;
 }
