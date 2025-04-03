@@ -28,6 +28,10 @@ extern int sol_entities_init() {
     return EXIT_SUCCESS;
 }
 
+extern int sol_entity_valid(sol_dude_handle_t dude) {
+    return (dude < MAX_ENTITIES && entities[dude].ds_id != 0);
+}
+
 static int is_alloc(sol_dude_handle_t dude) {
     return entities[dude].ds_id != 0;
 }
@@ -36,7 +40,7 @@ static void allocate_dude(sol_dude_handle_t dude) {
     entities[dude].ds_id = -1;
 }
 
-static sol_dude_handle_t get_valid_handle() {
+static sol_dude_handle_t create_valid_handle() {
     while (is_alloc(entity_pos) && entity_pos < MAX_ENTITIES) {
         entity_pos++;
     }
@@ -60,6 +64,80 @@ static sol_dude_handle_t get_valid_handle() {
     return MAX_ENTITIES;
 }
 
+extern int sol_entity_free(sol_dude_handle_t dude) {
+    if (!sol_entity_valid(dude)) {
+        goto invalid;
+    }
+
+    // TODO: WARNING WARNING WARNING, need to clear all references!!!
+
+    memset(entities + dude, 0x0, sizeof(sol_dude_t));
+
+    return EXIT_SUCCESS;
+    
+invalid:
+    return EXIT_FAILURE;
+}
+
+static char desc[1024];
+extern const char* sol_entity_short_description(sol_dude_handle_t dh) {
+    sol_dude_t *dude;
+    desc[0] = '\0';
+
+    if (!sol_entity_valid(dh)) {
+        strcpy(desc, "Invalid entity");
+        goto invalid;
+    }
+
+    dude = entities + dh;
+
+    if (dude->class[0].class == REAL_CLASS_ITEM) {
+       snprintf(desc, 1023, "%s: id: %d qty: %d, val: %d, charges: %d",
+               dude->name,
+               dude->ds_id,
+               dude->item.quantity,
+               dude->item.value,
+               dude->item.charges
+               //dude->item.special,
+               //dude->item.slot,
+               //dude->item.bonus,
+               //dude->item.weapon_type,
+               //dude->item.damage_type,
+               //dude->item.weight,
+               //dude->item.material,
+               //dude->item.placement,
+               //dude->item.range,
+               //dude->item.num_attacks,
+               //dude->item.sides,
+               //dude->item.dice,
+               //dude->item.mod,
+               //dude->item.flags,
+               //dude->item.legal_class,
+               //dude->item.base_AC,
+       );
+       desc[1023] = '\0'; // guard
+    } else {
+       snprintf(desc, 1023, "%s: id: %d stats: %d,%d,%d,%d,%d,%d hp:%d, psp:%d",
+               dude->name,
+               dude->ds_id,
+               dude->stats.str,
+               dude->stats.dex,
+               dude->stats.con,
+               dude->stats.intel,
+               dude->stats.wis,
+               dude->stats.cha,
+               dude->stats.hp,
+               dude->stats.psp
+       );
+       desc[1023] = '\0'; // guard
+    }
+
+    // intentional fall through
+    
+invalid:
+    return desc;
+}
+
 extern sol_dude_handle_t sol_entity_create_from_etab(soloscuro_state_t *state, int reg_id, int etab_id) {
     if (!state || reg_id < 0 || reg_id >= MAX_REGIONS || !state->regions[reg_id].gff_reg.etab) {
         return MAX_ENTITIES;
@@ -70,7 +148,7 @@ extern sol_dude_handle_t sol_entity_create_from_etab(soloscuro_state_t *state, i
     }
 
     gff_ojff_t ojff;
-    sol_dude_handle_t ret = get_valid_handle();
+    sol_dude_handle_t ret = create_valid_handle();
     sol_dude_t *dude = entities + (ret % MAX_ENTITIES);
 
     gff_etab_object_t *eo = state->regions[reg_id].gff_reg.etab + etab_id;
@@ -82,12 +160,11 @@ extern sol_dude_handle_t sol_entity_create_from_etab(soloscuro_state_t *state, i
     dude->z = ojff.zpos;
     dude->bmp = ojff.bmp_id;
     dude->script = ojff.script_id;
-    /* Ignored:
-    uint16_t flags;
-    int16_t  xoffset;
-    int16_t  yoffset;
-    uint8_t  object_index;
-    */
+    // Ignored:
+    //uint16_t flags;
+    //int16_t  xoffset;
+    //int16_t  yoffset;
+    //uint8_t  object_index;
     //printf("(%d, %d, %d) bmp: %d, script: %d\n", ojff.xpos, ojff.ypos, ojff.zpos, dude->bmp, dude->script);
     return ret;
 }
@@ -712,7 +789,7 @@ extern int sol_entity_distance(const sol_entity_t *source, const sol_entity_t *d
 extern int sol_entity_go(sol_entity_t *dude, const uint16_t x, uint16_t y) {
     if (!dude) { return EXIT_FAILURE; }
 
-    dude->abilities.must_go = 1;
+    //dude->abilities.must_go = 1;
     dude->abilities.args.pos.x = x;
     dude->abilities.args.pos.y = y;
     //printf("%s given go order to (%d, %d)\n", dude->name, x, y);
@@ -784,4 +861,127 @@ extern int sol_dude_print(sol_dude_t *pc) {
     //printf("    gender: %s\n", pc->gender == GENDER_MALE ? "Male" : "Female");
     printf("    str: %d dex: %d con: %d int: %d wis: %d cha: %d\n", pc->stats.str, pc->stats.dex, pc->stats.con, pc->stats.intel, pc->stats.wis, pc->stats.cha);
     return EXIT_SUCCESS;
+}
+
+static int ds1item_fill(soloscuro_state_t *state, sol_dude_handle_t dh, ds1_item_t *item) {
+    sol_dude_t *dude;
+    ds_item1r_t item1r;
+    if (!sol_entity_valid(dh)) { return EXIT_FAILURE; }
+
+    dude = entities + dh;
+
+    dude->ds_id = item->id;
+    dude->icon = item->icon;
+    dude->class[0].class = REAL_CLASS_ITEM;
+    if (gff_manager_ds1_read_name(&(state->man), item->name_idx, dude->name)) {
+        printf("Error: Unable to read name for item %d\n", item->id);
+    }
+    dude->item.quantity = item->quantity;
+    dude->item.value = item->value;
+    dude->item.charges = item->charges;
+    dude->item.special = item->special;
+    dude->item.slot = item->slot;
+    dude->item.bonus = item->bonus;
+
+    // TODO: Are these needed from item?
+    //int16_t  next;  // 4, for some internal book keeping.
+    //int16_t  pack_index;
+    //int16_t  item_index; // Correct, maps into it1r.
+    //uint16_t priority;
+    //int8_t   data0;
+
+    if (gff_manager_ds1_read_item1r(&(state->man), item->item_index, &item1r)) {
+        printf("Error: Unable to read item stats for %d\n", item->id);
+    }
+    dude->item.weapon_type = item1r.weapon_type;
+    dude->item.damage_type = item1r.damage_type;
+    dude->item.weight = item1r.weight;
+    dude->item.material = item1r.material;
+    dude->item.placement = item1r.placement;
+    dude->item.range = item1r.range;
+    dude->item.num_attacks = item1r.num_attacks;
+    dude->item.sides = item1r.sides;
+    dude->item.dice = item1r.dice;
+    dude->item.mod = item1r.mod;
+    dude->item.flags = item1r.flags;
+    dude->item.legal_class = item1r.legal_class;
+    dude->item.base_AC = item1r.base_AC;
+    dude->stats.hp = dude->stats.high_hp = item1r.base_hp;
+
+    return EXIT_SUCCESS;
+}
+
+static int ds1combat_fill(sol_dude_handle_t dh, ds1_combat_t *dc) {
+    sol_dude_t *dude;
+    if (!sol_entity_valid(dh)) { return EXIT_FAILURE; }
+
+    dude = entities + dh;
+
+    strncpy(dude->name, dc->name, SOL_NAME_MAX);
+    dude->name[SOL_NAME_MAX-1] = '\0'; // guard
+    dude->stats.hp = dc->hp;
+    dude->stats.high_hp = dc->hp;
+    dude->stats.psp = dc->psp;
+    dude->stats.high_psp = dc->psp;
+    dude->stats.str = dc->stats.str;
+    dude->stats.dex = dc->stats.dex;
+    dude->stats.con = dc->stats.con;
+    dude->stats.intel = dc->stats.intel;
+    dude->stats.wis = dc->stats.wis;
+    dude->stats.cha = dc->stats.cha;
+    dude->stats.base_ac = dc->ac;
+    dude->stats.base_move = dc->move;
+    dude->stats.base_thac0 = dc->thac0;
+    dude->stats.ds1_status = dc->status;
+    dude->stats.special_attack = dc->special_attack;
+    dude->stats.special_defense = dc->special_defense;
+
+    dude->ds_id = dc->id;
+    dude->icon = dc->icon;
+    dude->ds1_flags = dc->flags;
+
+    //TODO: Do these have any useful purpose?
+    //dc->priority 
+    //dc->char_index; // 4, unconfirmed but looks right.
+    //dc->ready_item_index; // 8, to be cleared.
+    //dc->weapon_index; // 10, to be cleared
+    //dc->pack_index;   // 12, to be cleared
+    //dc->data_block[8]; // just to shift down 8 bytes.
+    //dc->allegiance;
+    //dc-> thac0; // 31, confirmed
+    //dc->priority;
+
+    return EXIT_SUCCESS;
+}
+
+extern sol_dude_handle_t sol_entity_create(soloscuro_state_t *state, uint32_t id) {
+    gff_rdff_t rdff;
+    sol_dude_handle_t dude;
+
+    if (!state) {
+        goto null_error;
+    }
+
+    if (gff_read_rdff(state->man.ds1.segobjex, id, &rdff)) {
+        goto read_error;
+    }
+
+    if (!sol_entity_valid(dude = create_valid_handle())) {
+        goto invalid_dude;
+    }
+
+    if (rdff.header.load_action == RDFF_OBJECT && rdff.header.type == GFF_COMBAT_OBJECT) {
+        ds1combat_fill(dude, (ds1_combat_t*)rdff.data);
+    }
+
+    if (rdff.header.load_action == RDFF_OBJECT && rdff.header.type == GFF_ITEM_OBJECT) {
+        ds1item_fill(state, dude, (ds1_item_t*)rdff.data);
+    }
+
+    return dude;
+
+invalid_dude:
+read_error:
+null_error:
+    return -1;
 }

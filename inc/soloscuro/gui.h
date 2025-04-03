@@ -5,11 +5,6 @@
 
 #include <soloscuro/state.h>
 
-typedef struct sol_id_list_s {
-    uint32_t *ids;
-    uint32_t len;
-} sol_id_list_t;
-
 typedef struct sol_window_s {
     uint32_t id;
     uint32_t x, y, w, h;

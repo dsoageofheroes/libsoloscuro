@@ -12,18 +12,24 @@
 #include <soloscuro/state.h>
 //#include <soloscuro/entity-animation.h>
 
+#define REAL_CLASS_ITEM (REAL_CLASS_MAX + 1)
+
 extern int sol_entities_init();
 
+extern int               sol_entity_valid(sol_dude_handle_t dude);
 extern sol_dude_handle_t sol_entity_create_from_etab(soloscuro_state_t *state, int reg_id, int etab_id);
+extern sol_dude_handle_t sol_entity_create(soloscuro_state_t *state, uint32_t id);
+extern const char*       sol_entity_short_description(sol_dude_handle_t dude);
+extern int               sol_entity_free(sol_dude_handle_t dude);
 
 extern int sol_entity_create_default_human(sol_entity_t **ret);
-extern int sol_entity_create(const int add_inventory, sol_entity_t **ret);
+//extern int sol_entity_create(const int add_inventory, sol_entity_t **ret);
 extern int sol_entity_create_from_objex(const int id, sol_entity_t **ret);
 //extern int sol_entity_create_from_etab(gff_map_object_t *entry_table, uint32_t id, sol_entity_t **ret);
 extern int sol_entity_create_clone(sol_entity_t *clone, sol_entity_t **ret);
 extern int sol_entity_create_fake(const int mapx, const int mapy, sol_entity_t **ret);
 extern int sol_entity_is_fake(sol_entity_t *entity);
-extern int sol_entity_free(sol_entity_t *entity);
+//extern int sol_entity_free(sol_entity_t *entity);
 extern int sol_entity_gui_free(sol_entity_t *entity);
 extern int sol_entity_load_from_gff(sol_entity_t *entity, const int gff_idx, const int player, const int res_id);
 extern int sol_entity_copy_item(sol_entity_t *entity, sol_item_t *item, const size_t slot);

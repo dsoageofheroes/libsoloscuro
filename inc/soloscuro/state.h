@@ -46,16 +46,17 @@ typedef struct sol_stats_s {
     int8_t base_ac; // before applying any modifiers.
     int8_t base_move;
     int8_t base_thac0;
+    int8_t ds1_status;
+    uint8_t special_attack;
+    uint8_t special_defense;
     sol_slots_t wizard[10];
     sol_slots_t priest[10];
-    sol_combat_round_stats_t combat;
     uint8_t magic_resistance;
-    uint32_t special_defense;
-    sol_innate_attack_t attacks[3];
     sol_saving_throws_t saves;
 } sol_stats_t;
 
 
+/*
 typedef struct sol_psi_abilities_s {
     unsigned int psychokinesis    : 1;
     unsigned int psychometabolism : 1;
@@ -89,6 +90,7 @@ typedef struct sol_psi_abilities_s {
     unsigned int tower_of_iron_will    : 1;
     unsigned int ego_whip              : 1;
 } sol_psi_abilities_t;
+*/
 
 typedef struct sol_psin_s {
     uint8_t types[7];
@@ -103,10 +105,10 @@ typedef struct sol_psionic_list_s {
 #define MAX_DUDES_PER_REGION (1024)
 
 typedef struct sol_ability_set_s {
-    unsigned int hunt             : 1; unsigned int attackable       : 1;
-    unsigned int talkable         : 1;
-    unsigned int must_go          : 1; // given order to go to x,y
-    sol_psi_abilities_t psi;
+    //unsigned int hunt             : 1; unsigned int attackable       : 1;
+    //unsigned int talkable         : 1;
+    //unsigned int must_go          : 1; // given order to go to x,y
+    //sol_psi_abilities_t psi;
     //struct spell_abilities_s spells; // NOT shown
     //struct class_abilities_s class;  // Not shown
     union {
@@ -122,8 +124,37 @@ typedef struct sol_class_s {
     int8_t class;
     int8_t level;
     uint8_t high_level; // for level drain.
-    sol_psi_abilities_t psi;
+    //sol_psi_abilities_t psi;
 } sol_class_t;
+
+typedef struct sol_item_state_s {
+    uint16_t quantity;
+    uint16_t value;
+    uint16_t charges;
+    uint8_t  special;
+    uint8_t  slot;
+    int8_t   bonus;
+    uint8_t  weapon_type;
+    uint16_t damage_type;
+    uint8_t  weight;
+    uint8_t  material;
+    uint8_t  placement;
+    uint8_t  range;// Need to confirm
+    uint8_t  num_attacks;
+    uint8_t  sides;
+    uint8_t  dice;
+    int8_t   mod;
+    uint8_t  flags;
+    uint16_t legal_class;
+    int8_t   base_AC;
+} sol_item_state_t;
+
+typedef struct sol_combat_state_s {
+    sol_innate_attack_t attacks[3];
+    sol_combat_round_stats_t combat;
+} sol_combat_state_t;
+
+#define SOL_NAME_MAX (40)
 
 typedef struct sol_entity_s {
     /*
@@ -152,19 +183,26 @@ typedef struct sol_entity_s {
     //spell_list_t *spells;
     //psionic_list_t *psionics;
     */
+    char name[SOL_NAME_MAX];
     uint16_t x, y, z, ds_id;
     uint16_t bmp, script;
-    sol_stats_t stats;
+    int16_t icon;
+    uint8_t ds1_flags;
     sol_class_t class[3];
+    sol_stats_t stats;
     sol_ability_set_t abilities;
+    union {
+        sol_item_state_t item;
+        sol_combat_state_t combat;
+    };
 } sol_entity_t;
+
 
 typedef uint32_t sol_entity_handle_t;
 
 // For the lolz
 typedef sol_entity_t sol_dude_t;
 typedef sol_entity_handle_t sol_dude_handle_t;
-
 
 typedef struct sol_region_s {
     gff_region_t gff_reg;
@@ -193,5 +231,15 @@ extern soloscuro_state_t* soloscuro_state_create();
 extern void               soloscuro_state_free(soloscuro_state_t *state);
 extern int                sol_load_ds1(soloscuro_state_t *state, const char *path);
 extern int                sol_init();
+
+typedef struct sol_id_list_s {
+    int valid;
+    uint32_t *ids;
+    uint32_t len;
+} sol_id_list_t;
+
+extern void               sol_list_free(sol_id_list_t *list);
+extern sol_id_list_t      sol_state_combat_ids(soloscuro_state_t *state);
+extern sol_id_list_t      sol_state_item_ids(soloscuro_state_t *state);
 
 #endif

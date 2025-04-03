@@ -6,7 +6,7 @@
 
 //#include <soloscuro/alignment.h>
 //#include <soloscuro/class.h>
-//#include <soloscuro/entity.h>
+#include <soloscuro/entity.h>
 #include <soloscuro/gui.h>
 //#include <soloscuro/gff-map.h>
 //#include <soloscuro/item.h>

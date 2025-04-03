@@ -1,5 +1,6 @@
 .{
-    .name = "libgff",
+    .name = .libgff,
+    .fingerprint = 0x111791df5a03983b,
     .version = "0.6.0",
     .dependencies = .{
         .libgff = .{
